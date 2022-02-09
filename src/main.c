@@ -139,6 +139,14 @@ int main(int argc, const char **argv)
 			hhkb_quit(handle);
 		}
 
+		// Hybrid models reserve FN+Q, FN+Z, and FN+X respectively
+		if ((key == 44 || key == 17 || key == 16) && fn) {
+			if (hhkb_is_hybrid(handle) ) {
+				printf("error: this key is reserved on hybrid models\n");
+				hhkb_quit(handle);
+			}
+		}
+		
 		// Confirm operation
 		printf("Are you sure you want to assign 0x%02X to %i?\nPlease type 'confirm' to continue: ", code, key);
 		char str[10];
