@@ -93,9 +93,9 @@ The first number on each key is what you should pass to `--remap-key`.
 
 You can find all [USB HID scan codes here](https://gist.github.com/MightyPork/6da26e382a7ad91b5496ee55fdc73db2), which should be passed to `--scancode`.
 
-For example, to assign a Media Play/Pause key to the Z key on your function layer, you would run:
+For example, to assign a Media Play/Pause key to the C key on your function layer, you would run:
 ```
-hhg --remap-key 17 --scancode 0xe8 --fn
+hhg --remap-key 15 --scancode 0xe8 --fn
 ```
 
 ## License
