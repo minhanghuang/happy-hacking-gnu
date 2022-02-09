@@ -66,7 +66,7 @@ Firmware options
 ```
 ## Remapping guide
 
-**Note:** It is possible to use scancodes that are not in the official software, but there are a few limitations. Most notably, media keys will act up if assigned to keys on the third row, since the HHKB uses a separate USB interface to send these.
+**Note:** It is possible to use scancodes that are not in the official software, but there are a few limitations. Most notably, unsupported media keys will act up if assigned to most keys, since the HHKB usually uses a separate USB interface to send these.
 
 **Note 2:** Japanese layout HHKBs are not yet supported.
 
