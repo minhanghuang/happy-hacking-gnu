@@ -695,3 +695,124 @@ static void hhkb_print_layout_ansi(hid_device *handle, int fn_layer)
 
 	printf("\n\n");
 }
+
+static void hhkb_print_layout_jis(hid_device *handle, int fn_layer)
+{
+	unsigned char *layout;
+	int i;
+
+	// Get layout array
+	layout = hhkb_get_layout(handle, fn_layer);
+
+	// Print first row
+	printf("----------------------------------------------------------------------------\n|");
+	for (i = 69; i > 54; i--) {
+		printf(" %02d |", i);
+	}
+	printf("\n|");
+	for (i = 69; i > 54; i--) {
+		printf(" %02x |", layout[i]);
+	}
+	printf("\n----------------------------------------------------------------------------\n|");
+
+	// Print second row
+	for (i = 54; i > 40; i--) {
+		if (i == 54) {
+			printf("  %02d  |", i);
+		} else if (i == 41) {
+			printf("  %02d   |", i);
+		} else {
+			printf(" %02d |", i);
+		}
+	}
+	printf("\n|");
+
+	for (i = 54; i > 40; i--) {
+		if (i == 54) {
+			printf("  %02x  |", layout[i]);
+		} else if (i == 41) {
+			printf("  %02x   |", layout[i]);
+		} else {
+
+			printf(" %02x |", layout[i]);
+		}
+	}
+
+	printf("\n---------------------------------------------------------------------      |\n|");
+
+	// Print third row
+	for (i = 40; i > 27; i--) {
+		if (i == 40) {
+			printf("  %02d   |", i);
+		} else {
+			printf(" %02d |", i);
+		}
+	}
+	printf("      |");
+
+	printf("\n|");
+
+	for (i = 40; i > 27; i--) {
+		if (i == 40) {
+			printf("  %02x   |", layout[i]);
+		} else {
+
+			printf(" %02x |", layout[i]);
+		}
+	}
+	printf("      |");
+
+	printf("\n----------------------------------------------------------------------------\n|");
+
+	// Print fourth row
+	for (i = 27; i > 13; i--) {
+		if (i == 27) {
+			printf("   %02d    |", i);
+		} else {
+			printf(" %02d |", i);
+		}
+	}
+	printf("\n|");
+
+	for (i = 27; i > 13; i--) {
+		if (i == 27) {
+			printf("   %02x    |", layout[i]);
+		} else {
+			printf(" %02x |", layout[i]);
+		}
+	}
+
+	printf("\n----------------------------------------------------------------------------\n|");
+
+	// Print bottom row
+	for (i = 13; i > 0; i--) {
+		if (i == 13) {
+			printf(" %02d | |", i);
+		} else if (i == 8) {
+			printf("    %02d    |", i);
+		} else if (i == 3) {
+			printf(" | %02d |", i);
+		} else {
+			printf(" %02d |", i);
+		}
+	}
+	printf("\n|");
+
+	for (i = 13; i > 0; i--) {
+		if (i == 13) {
+			printf(" %02x | |", layout[i]);
+		} else if (i == 8) {
+			printf("    %02x    |", layout[i]);
+		} else if (i == 3) {
+			printf(" | %02x |", layout[i]);
+		} else {
+			printf(" %02x |", layout[i]);
+		}
+	}
+	printf("\n------ ---------------------------------------------------- ----------------");
+
+	// Free layout array
+	free(layout);
+
+	printf("\n\n");
+}

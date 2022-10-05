@@ -77,7 +77,7 @@ int main(int argc, const char **argv)
 	}
 
 	// Set remap flag if proper args are set
-	if (key != 0 && key <= 60 && code != 0 && code <= 0xff) {
+	if (key != 0 && key <= 69 && code != 0 && code <= 0xff) {
 		action |= ACTION_REMAP;
 	}
 
@@ -89,6 +89,11 @@ int main(int argc, const char **argv)
 
 	// Connect to device
 	hid_device *handle = hhkb_init();
+
+	// Set remap flag if proper args are set
+	if (key > 0 && key <= (hhkb_is_jis(handle) ? 60 : 69) && code > 0 && code <= 0xff) {
+		action |= ACTION_REMAP;
+	}
 
 	// Debug log
 	if (verbose_log)
@@ -105,13 +110,10 @@ int main(int argc, const char **argv)
 		hhkb_print_keyboard_mode(handle);
 	}
 	else if (action & ACTION_KEYMAP) {
-		// Abort if using Japanese HHKB
-		if (hhkb_is_jis(handle)) {
-			printf("error: this model isn't supported yet\n");
-			hhkb_quit(handle);
-		}
-
-		hhkb_print_layout_ansi(handle, fn);
+		if (hhkb_is_jis(handle))
+			hhkb_print_layout_jis(handle, fn);
+		else
+			hhkb_print_layout_ansi(handle, fn);
 	}
 	else if (action & ACTION_FACTORY_RESET) {
 		// Confirm operation
@@ -128,12 +130,6 @@ int main(int argc, const char **argv)
 		}
 	}
 	else if (action & ACTION_REMAP) {
-		// Abort if using Japanese HHKB
-		if (hhkb_is_jis(handle)) {
-			printf("error: this model isn't supported yet\n");
-			hhkb_quit(handle);
-		}
-
 		// Hybrid models reserve FN+Q for pairing
 		// FN+Z and FN+X are technically reserved as well, but can be remapped fine excluding media keys
 		if (hhkb_is_hybrid(handle) && fn && (hhkb_is_jis(handle) ? key == 53 : key == 44)) {
