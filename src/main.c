@@ -52,8 +52,8 @@ int main(int argc, const char **argv)
 		OPT_BIT('k', "keymap", &action, "print current keymap", NULL, ACTION_KEYMAP),
 		OPT_BIT('f', "factory-reset", &action, "reset to factory defaults", NULL, ACTION_FACTORY_RESET),
 		OPT_GROUP("Keymapping options"),
-		OPT_INTEGER(0, "remap-key", &key, "key number to remap", NULL, OPT_NONEG),
-		OPT_INTEGER(0, "scancode", &code, "hid scancode to map", NULL, OPT_NONEG),
+		OPT_INTEGER('r', "remap-key", &key, "key number to remap", NULL, OPT_NONEG),
+		OPT_INTEGER('s', "scancode", &code, "hid scancode to map", NULL, OPT_NONEG),
 		OPT_BOOLEAN(0, "fn", &fn, "operate on function layer"),
 		OPT_GROUP("Firmware options (not implemented)"),
 		OPT_STRING(0, "flash-firmware", &fw_file, "flash firmware from file"),
@@ -94,29 +94,25 @@ int main(int argc, const char **argv)
 	if (verbose_log)
 		hhkb_print_product_info(handle);
 
-	// Print info
+	// Handle selected action
 	if (action & ACTION_INFO) {
 		hhkb_print_info(handle);
 	}
-	// Print dipswitch state
 	else if (action & ACTION_DIP) {
 		hhkb_print_dip_switch_state(handle);
 	}
-	// Print keyboard mode
 	else if (action & ACTION_MODE) {
 		hhkb_print_keyboard_mode(handle);
 	}
-	// Print layout
 	else if (action & ACTION_KEYMAP) {
 		// Abort if using Japanese HHKB
-		if (hhkb_is_japanese_layout(handle)) {
+		if (hhkb_is_jis(handle)) {
 			printf("error: this model isn't supported yet\n");
 			hhkb_quit(handle);
 		}
 
 		hhkb_print_layout_ansi(handle, fn);
 	}
-	// Factory reset device
 	else if (action & ACTION_FACTORY_RESET) {
 		// Confirm operation
 		printf("Are you sure you want to restore factory defaults?\nPlease type 'reset' to continue: ");
@@ -131,17 +127,16 @@ int main(int argc, const char **argv)
 			printf("Aborting..\n");
 		}
 	}
-	// Remap key
 	else if (action & ACTION_REMAP) {
 		// Abort if using Japanese HHKB
-		if (hhkb_is_japanese_layout(handle)) {
+		if (hhkb_is_jis(handle)) {
 			printf("error: this model isn't supported yet\n");
 			hhkb_quit(handle);
 		}
 
 		// Hybrid models reserve FN+Q for pairing
 		// FN+Z and FN+X are technically reserved as well, but can be remapped fine excluding media keys
-		if (key == 44 && fn && hhkb_is_hybrid(handle)) {
+		if (hhkb_is_hybrid(handle) && fn && (hhkb_is_jis(handle) ? key == 53 : key == 44)) {
 			printf("error: FN+Q is reserved for bluetooth pairing on hybrid models\n");
 			hhkb_quit(handle);
 		}

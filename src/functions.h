@@ -19,9 +19,8 @@ enum {
 
 static void hhkb_notify_application_state(hid_device *handle, unsigned char open)
 {
-	unsigned char *buffer;
-
 	// Allocate buffer for communications
+	unsigned char *buffer;
 	buffer = (unsigned char *)malloc(USB_BUFFER_SIZE);
 	memset(buffer, 0x0, USB_BUFFER_SIZE);
 
@@ -190,7 +189,7 @@ static void hhkb_print_info(hid_device *handle)
 	free(buffer);
 }
 
-static int hhkb_is_japanese_layout(hid_device *handle)
+static int hhkb_is_jis(hid_device *handle)
 {
 	unsigned char *buffer;
 	char model[64];
@@ -242,8 +241,8 @@ static int hhkb_is_hybrid(hid_device *handle)
 	// Free read buffer
 	free(buffer);
 
-	// Hybrid models (non-Japanese) are PD-KB800x, PD-KB800xx, or PD-KB800xxx depending on exact model
-	return !!strstr(model, "800");
+	// Hybrid models are PD-KB800xx, PD-KB820xx depending on exact model
+	return !!strstr(model, "KB8");
 }
 
 static unsigned char *hhkb_get_layout(hid_device *handle, unsigned char with_fn)
@@ -374,9 +373,8 @@ static void hhkb_reset_to_factory_default(hid_device *handle)
 
 static void hhkb_reset_dipsw(hid_device *handle)
 {
-	unsigned char *buffer;
-
 	// Allocate buffer for communications
+	unsigned char *buffer;
 	buffer = (unsigned char *)malloc(USB_BUFFER_SIZE);
 	memset(buffer, 0x0, USB_BUFFER_SIZE);
 
@@ -417,10 +415,10 @@ static void hhkb_reset_dipsw(hid_device *handle)
 
 static void hhkb_write_keymap(hid_device *handle, unsigned char *layout, char fn)
 {
-	unsigned char *buffer;
 	int i;
 
-	// First pass
+	// Allocate buffer for communications
+	unsigned char *buffer;
 	buffer = (unsigned char *)malloc(USB_BUFFER_SIZE);
 	memset(buffer, 0x0, USB_BUFFER_SIZE);
 
@@ -691,18 +689,6 @@ static void hhkb_print_layout_ansi(hid_device *handle, int fn_layer)
 		}
 	}
 	printf("\n        ------------------------------------------------------------");
-
-	/*  printf("\n\n");
-		int stagger;
-		stagger = 0;
-		for (i = 60; i < 128; i++) {
-			if (stagger == 7) {
-				printf("\n");
-				stagger = 0;
-			}
-			printf("[%03d] = %03x  ", i, layout[i]);
-			stagger++;
-		}*/
 
 	// Free layout array
 	free(layout);

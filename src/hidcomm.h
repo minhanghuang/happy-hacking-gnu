@@ -8,18 +8,26 @@
 
 static hid_device *hhkb_get_programming_interface()
 {
-	struct hid_device_info *devices;
+	struct hid_device_info *devices, *current_device;
 	hid_device *ret;
 	// Enumerate hid devices in order to find the programming interface
 	devices = hid_enumerate(0x04fe, 0x0);
 	ret = 0;
 
-	for (struct hid_device_info *device = devices; device; device = device->next) {
+	for (current_device = devices; !!current_device; current_device = current_device->next) {
 		// Ignore devices if the product ID is out of the HHKB range
+		if (current_device->product_id <= 0x0020 && current_device->product_id >= 0x22)
+			continue;
+
 		// Select current path if third interface (used by Keymap Tool)
-		if (device->product_id >= 0x0020 && device->product_id <= 0x22
-				&& device->interface_number == 2) {
-			ret = hid_open_path(device->path);
+		if (current_device->interface_number != 2)
+			continue;
+
+		// Open selected HID device
+		if (!(ret = hid_open_path(current_device->path))) {
+			printf("error: unable to open handle (%ls)\n", hid_error(NULL));
+			exit(EXIT_FAILURE);
+		} else {
 			break;
 		}
 	}
@@ -36,24 +44,14 @@ static hid_device *hhkb_get_programming_interface()
 
 static hid_device *hhkb_init()
 {
-	hid_device *handle;
-	int res;
-
 	// Initialize hidapi library
 	if (hid_init() < 0) {
 		printf("error: failed to run hid_init() (%ls)\n", hid_error(NULL));
-		exit(-1);
+		exit(EXIT_FAILURE);
 	}
 
 	// Open handle to the remapping HID device
-	handle = hhkb_get_programming_interface();
-
-	if (!handle) {
-		printf("error: unable to open handle (%ls)\n", hid_error(NULL));
-		exit(-1);
-	}
-
-	return handle;
+	return hhkb_get_programming_interface();
 }
 
 static void hhkb_quit(hid_device *handle)
@@ -119,13 +117,12 @@ static void hhkb_write_buf(hid_device *handle, unsigned char *buffer)
 
 static unsigned char *hhkb_read(hid_device *handle)
 {
-	unsigned char *buffer;
-
 	// Allocate read buffer
-	buffer = (unsigned char *)malloc(65);
+	unsigned char *buffer;
+	buffer = (unsigned char *)malloc(USB_BUFFER_SIZE);
 
 	// Read from device
-	if (hid_read(handle, buffer, 65) < 0) {
+	if (hid_read(handle, buffer, USB_BUFFER_SIZE) < 0) {
 		printf("error: unable to read from HID device (%ls)\n", hid_error(handle));
 		hhkb_quit(handle);
 	}
