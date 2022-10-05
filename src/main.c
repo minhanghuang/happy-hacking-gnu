@@ -91,7 +91,7 @@ int main(int argc, const char **argv)
 	hid_device *handle = hhkb_init();
 
 	// Set remap flag if proper args are set
-	if (key > 0 && key <= (hhkb_is_jis(handle) ? 60 : 69) && code > 0 && code <= 0xff) {
+	if (key > 0 && key <= (hhkb_is_jis(handle) ? 69 : 60) && code > 0 && code <= 0xff) {
 		action |= ACTION_REMAP;
 	}
 
