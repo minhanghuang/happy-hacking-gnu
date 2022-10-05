@@ -16,7 +16,7 @@ static hid_device *hhkb_get_programming_interface()
 
 	for (current_device = devices; !!current_device; current_device = current_device->next) {
 		// Ignore devices if the product ID is out of the HHKB range
-		if (current_device->product_id <= 0x0020 && current_device->product_id >= 0x22)
+		if (current_device->product_id < 0x0020 || current_device->product_id > 0x22)
 			continue;
 
 		// Select current path if third interface (used by Keymap Tool)
