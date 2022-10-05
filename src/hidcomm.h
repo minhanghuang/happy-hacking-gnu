@@ -8,22 +8,20 @@
 
 static hid_device *hhkb_get_programming_interface()
 {
-	struct hid_device_info *devices, *current_device;
+	struct hid_device_info *devices;
 	hid_device *ret;
 	// Enumerate hid devices in order to find the programming interface
-	current_device = devices = hid_enumerate(0x04fe, 0x0);
+	devices = hid_enumerate(0x04fe, 0x0);
 	ret = 0;
 
-	while (current_device) {
+	for (struct hid_device_info *device = devices; device; device = device->next) {
 		// Ignore devices if the product ID is out of the HHKB range
-		if (current_device->product_id < 0x0020 || current_device->product_id > 0x22)
-			continue;
-
-		// The third interface is used by the Keymap Tool
-		if (current_device->interface_number == 2)
-			ret = hid_open_path(current_device->path);
-
-		current_device = current_device->next;
+		// Select current path if third interface (used by Keymap Tool)
+		if (device->product_id >= 0x0020 && device->product_id <= 0x22
+				&& device->interface_number == 2) {
+			ret = hid_open_path(device->path);
+			break;
+		}
 	}
 
 	// Quit if interface is not found
