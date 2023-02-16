@@ -55,7 +55,7 @@ int main(int argc, const char **argv)
 		OPT_INTEGER('r', "remap-key", &key, "key number to remap", NULL, OPT_NONEG),
 		OPT_INTEGER('s', "scancode", &code, "hid scancode to map", NULL, OPT_NONEG),
 		OPT_BOOLEAN(0, "fn", &fn, "operate on function layer"),
-		OPT_GROUP("Firmware options (not implemented)"),
+		OPT_GROUP("Firmware options"),
 		OPT_STRING(0, "flash-firmware", &fw_file, "flash firmware from file"),
 		OPT_BIT(0, "dump-firmware", &action, "save current firmware to file", NULL, ACTION_DUMP_FW, 0),
 
@@ -71,7 +71,7 @@ int main(int argc, const char **argv)
 	argc = argparse_parse(&argparse, argc, argv);
 
 	// We can't do firmware stuff yet
-	if (action & ACTION_DUMP_FW || (strlen(fw_file) && action == 0)) {
+	if (strlen(fw_file) && action == 0) {
 		printf("error: this command isn't implemented yet\n");
 		return EXIT_FAILURE;
 	}
@@ -146,6 +146,19 @@ int main(int argc, const char **argv)
 		if (!strcmp(str, "confirm\n")) {
 			Sleep(1000);
 			hhkb_remap_key(handle, key, code, fn);
+		} else {
+			printf("Aborting..\n");
+		}
+	}
+	else if (action & ACTION_DUMP_FW) {
+		// Confirm operation
+		printf("This operation will take a couple of minutes, during which the keyboard will not be functional.\nPlease type 'confirm' to continue: ");
+		char str[10];
+		fgets(str, 10, stdin);
+
+		// Check input text
+		if (!strcmp(str, "confirm\n")) {
+			hhkb_dump_firmware(handle);
 		} else {
 			printf("Aborting..\n");
 		}

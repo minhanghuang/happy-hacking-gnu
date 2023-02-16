@@ -1,5 +1,6 @@
 #pragma once
 #include "hidcomm.h"
+#include <stdio.h>
 
 // Debug logging flag
 extern int verbose_log;
@@ -14,7 +15,8 @@ enum {
 	GET_KEYBOARD_MODE = 6,
 	RESET_DIPSW = 7,
 	WRITE_KEYMAP = 134,
-	GET_KEYMAP = 135
+	GET_KEYMAP = 135,
+	DUMP_FIRMWARE = 208
 };
 
 // Struct for GET_KEYBOARD_INFO
@@ -166,10 +168,10 @@ static void hhkb_print_keyboard_mode(hid_device *handle)
 	}
 }
 
-static hhkb_info* hhkb_get_info(hid_device *handle)
+static hhkb_info *hhkb_get_info(hid_device *handle)
 {
 	unsigned char *buffer;
-	hhkb_info* result;
+	hhkb_info *result;
 
 	// Write to HID device and save response to buffer
 	hhkb_write(handle, GET_KEYBOARD_INFO);
@@ -273,7 +275,6 @@ static unsigned char *hhkb_get_layout(hid_device *handle, unsigned char with_fn)
 {
 	unsigned char *buffer;
 	unsigned char *layout;
-	int res;
 	int i;
 
 	// Allocate buffer for communication
@@ -839,4 +840,82 @@ static void hhkb_print_layout_jis(hid_device *handle, int fn_layer)
 	free(layout);
 
 	printf("\n\n");
+}
+
+static void hhkb_dump_firmware(hid_device *handle)
+{
+	unsigned char *buffer;
+	unsigned char *data;
+	char filename[64];
+	int size;
+	int read;
+	int i;
+	hhkb_info *info;
+
+	// Get serial number for filename
+	info = hhkb_get_info(handle);
+
+	// Format filename for firmware
+	sprintf(filename, "%s.BIN", info->serial);
+
+	// Allocate buffer for communication
+	buffer = (unsigned char *)calloc(USB_BUFFER_SIZE, 1);
+
+	// Allocate firmware data array
+	data = (unsigned char *)calloc(256000, 1);
+
+	// Added by USBDriver::Send
+	buffer[0] = 0;
+
+	// 170 is used in buffer[1] and buffer[2] for all requests
+	buffer[1] = 170;
+	buffer[2] = 170;
+
+	// Request index
+	buffer[3] = DUMP_FIRMWARE;
+
+	// Write to HID device
+	hhkb_write_buf(handle, buffer);
+	free(buffer);
+
+	// Total read bytes
+	size = 0;
+
+	// Read loop
+	do {
+		// Save response to buffer
+		buffer = hhkb_read(handle);
+
+		// Debug log
+		if (verbose_log) {
+			printf("debug: DUMP_FIRMWARE ");
+			for (int i = 0; i < 8; i++) {
+				printf("0x%02X ", buffer[i]);
+			}
+			printf("\n");
+		}
+
+		// Get number of bytes to read
+		read = buffer[5] - 2;
+
+		// Copy firmware data to buffer
+		memcpy(data + size, buffer + 8, read);
+		size += read;
+	} while (read >= 56);
+
+	// Save firmware data to file
+	FILE *f = fopen(filename, "wb");
+	if (!f || !fwrite(data, size, 1, f)) {
+		printf("error: failed to data write to disk\n");
+		hhkb_quit(handle);
+	}
+	fclose(f);
+
+	// Print result
+	printf("%i bytes written to %s\n", size, filename);
+
+	// Free buffers
+	free(buffer);
+	free(info);
+	free(data);
 }
