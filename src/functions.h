@@ -17,6 +17,24 @@ enum {
 	GET_KEYMAP = 135
 };
 
+// Struct for GET_KEYBOARD_INFO
+typedef struct {
+	// Model number
+	char type_number[20];
+	// Model revision
+	char revision[4];
+	// Serial number
+	char serial[16];
+	// This is the 'primary' or 'A' version of the firmware, running on bank 2
+	char appfirmversion[8];
+	// This is the 'backup' or 'B' version of the firmware, running on bank 1
+	// which will boot instead of AppFirm in case the primary firmware is corrupt
+	char bootfirmversion[8];
+	// This value is zero if running on AppFirm, and one if
+	// the board is using BootFirm
+	char runningfirmware;
+} hhkb_info;
+
 static void hhkb_notify_application_state(hid_device *handle, unsigned char open)
 {
 	// Allocate buffer for communications
@@ -58,9 +76,10 @@ static void hhkb_notify_application_state(hid_device *handle, unsigned char open
 	}
 }
 
-static void hhkb_print_dip_switch_state(hid_device *handle)
+static unsigned char *hhkb_get_dip_switch_state(hid_device *handle)
 {
 	unsigned char *buffer;
+	unsigned char *ret;
 	int i;
 
 	// Write to HID device and save response to buffer
@@ -76,9 +95,23 @@ static void hhkb_print_dip_switch_state(hid_device *handle)
 		printf("\n");
 	}
 
+	// Copy result from buffer, so unnecessary ReadCheck stuff isn't returned
+	ret = malloc(6);
+	memcpy(ret, buffer + 6, 6);
+
+	// Free read buffer
+	free(buffer);
+	return ret;
+}
+
+static void hhkb_print_dip_switch_state(hid_device *handle)
+{
+	unsigned char *buffer = hhkb_get_dip_switch_state(handle);
+	int i;
+
 	// Loop through results
-	for (i = 1; i <= 6; i++) {
-		printf("Dip switch %i state: %s\n", i, buffer[i + 5] ? "On" : "Off");
+	for (i = 0; i < 6; i++) {
+		printf("Dip switch %i state: %s\n", i, buffer[i] ? "On" : "Off");
 	}
 
 	free(buffer);
@@ -106,7 +139,6 @@ static unsigned char hhkb_get_keyboard_mode(hid_device *handle)
 
 	// Free read buffer
 	free(buffer);
-
 	return ret;
 }
 
@@ -134,9 +166,10 @@ static void hhkb_print_keyboard_mode(hid_device *handle)
 	}
 }
 
-static void hhkb_print_info(hid_device *handle)
+static hhkb_info* hhkb_get_info(hid_device *handle)
 {
 	unsigned char *buffer;
+	hhkb_info* result;
 
 	// Write to HID device and save response to buffer
 	hhkb_write(handle, GET_KEYBOARD_INFO);
@@ -151,42 +184,33 @@ static void hhkb_print_info(hid_device *handle)
 		printf("\n");
 	}
 
-	// Print type_number
-	char type_number[64];
-	memcpy(type_number, buffer + 6, 20);
-	printf("TypeNumber: %s\n", type_number);
-
-	// Print revision
-	char revision[64];
-	memcpy(revision, buffer + 26, 4);
-	printf("Revision: %s\n", revision);
-
-	// Print serial
-	char serial[64];
-	memcpy(serial, buffer + 30, 16);
-	printf("Serial: %s\n", serial);
-
-	// This is the 'primary' or 'A' version of the firmware, running on bank 2
-	char appfirmversion[64];
-	memcpy(appfirmversion, buffer + 46, 8);
-	printf("AppFirmVersion: %X%d.%d%d\n", appfirmversion[0], appfirmversion[1],
-		appfirmversion[2], appfirmversion[3]);
-
-	// This is the 'backup' or 'B' version of the firmware, running on bank 1
-	// which will boot instead of AppFirm in case the primary firmware is corrupt
-	char bootfirmversion[64];
-	memcpy(bootfirmversion, buffer + 54, 8);
-	printf("BootFirmVersion: %X%d.%d%d\n", bootfirmversion[0], bootfirmversion[1],
-		bootfirmversion[2], bootfirmversion[3]);
-
-	// This value is zero if running on AppFirm, and one if
-	// the board is using BootFirm
-	char runningfirmware;
-	memcpy(&runningfirmware, buffer + 62, 1);
-	printf("RunningFirmware: %d\n", runningfirmware);
+	result = malloc(sizeof(hhkb_info));
+	memcpy(result, buffer + 6, sizeof(hhkb_info));
 
 	// Free read buffer
 	free(buffer);
+	return result;
+}
+
+static void hhkb_print_info(hid_device *handle)
+{
+	hhkb_info *info;
+
+	// Get keyboard info
+	info = hhkb_get_info(handle);
+
+	// Print info
+	printf("TypeNumber: %s\n", info->type_number);
+	printf("Revision: %s\n", info->revision);
+	printf("Serial: %s\n", info->serial);
+	printf("AppFirmVersion: %X%d.%d%d\n", info->appfirmversion[0], info->appfirmversion[1],
+		info->appfirmversion[2], info->appfirmversion[3]);
+	printf("BootFirmVersion: %X%d.%d%d\n", info->bootfirmversion[0], info->bootfirmversion[1],
+		info->bootfirmversion[2], info->bootfirmversion[3]);
+	printf("RunningFirmware: %d\n", info->runningfirmware);
+
+	// Free info buffer
+	free(info);
 }
 
 static int hhkb_is_jis(hid_device *handle)
