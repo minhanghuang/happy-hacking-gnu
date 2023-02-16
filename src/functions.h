@@ -1,6 +1,5 @@
 #pragma once
 #include "hidcomm.h"
-#include <stdio.h>
 
 // Debug logging flag
 extern int verbose_log;
@@ -32,8 +31,7 @@ typedef struct {
 	// This is the 'backup' or 'B' version of the firmware, running on bank 1
 	// which will boot instead of AppFirm in case the primary firmware is corrupt
 	char bootfirmversion[8];
-	// This value is zero if running on AppFirm, and one if
-	// the board is using BootFirm
+	// This value is zero if running on AppFirm, and one if the board is using BootFirm
 	char runningfirmware;
 } hhkb_info;
 
@@ -41,8 +39,7 @@ static void hhkb_notify_application_state(hid_device *handle, unsigned char open
 {
 	// Allocate buffer for communications
 	unsigned char *buffer;
-	buffer = (unsigned char *)malloc(USB_BUFFER_SIZE);
-	memset(buffer, 0x0, USB_BUFFER_SIZE);
+	buffer = (unsigned char *)calloc(USB_BUFFER_SIZE, 1);
 
 	// Added by USBDriver::Send
 	buffer[0] = 0;
@@ -97,7 +94,7 @@ static unsigned char *hhkb_get_dip_switch_state(hid_device *handle)
 		printf("\n");
 	}
 
-	// Copy result from buffer, so unnecessary ReadCheck stuff isn't returned
+	// Copy result from buffer, so ReadCheck data isn't returned
 	ret = malloc(6);
 	memcpy(ret, buffer + 6, 6);
 
@@ -108,14 +105,18 @@ static unsigned char *hhkb_get_dip_switch_state(hid_device *handle)
 
 static void hhkb_print_dip_switch_state(hid_device *handle)
 {
-	unsigned char *buffer = hhkb_get_dip_switch_state(handle);
+	unsigned char *buffer;
 	int i;
+
+	// Get DIP switch state
+	buffer = hhkb_get_dip_switch_state(handle);
 
 	// Loop through results
 	for (i = 0; i < 6; i++) {
 		printf("Dip switch %i state: %s\n", i, buffer[i] ? "On" : "Off");
 	}
 
+	// Free buffer
 	free(buffer);
 }
 
@@ -278,12 +279,10 @@ static unsigned char *hhkb_get_layout(hid_device *handle, unsigned char with_fn)
 	int i;
 
 	// Allocate buffer for communication
-	buffer = (unsigned char *)malloc(USB_BUFFER_SIZE);
-	memset(buffer, 0x0, USB_BUFFER_SIZE);
+	buffer = (unsigned char *)calloc(USB_BUFFER_SIZE, 1);
 
 	// Allocate layout array
-	layout = (unsigned char *)malloc(128);
-	memset(layout, 0x0, 128);
+	layout = (unsigned char *)calloc(128, 1);
 
 	// Added by USBDriver::Send
 	buffer[0] = 0;
@@ -380,8 +379,7 @@ static void hhkb_reset_to_factory_default(hid_device *handle)
 		printf("\n");
 	}
 
-	// Verify if device responded with the correct
-	// sequence of bytes
+	// Verify if device responded with the correct sequence of bytes
 	if (buffer[0] == 85 && buffer[1] == 85 && buffer[2] == 3 && buffer[3] == 0) {
 		printf("Success\n");
 	} else {
@@ -400,9 +398,8 @@ static void hhkb_reset_dipsw(hid_device *handle)
 {
 	// Allocate buffer for communications
 	unsigned char *buffer;
-	buffer = (unsigned char *)malloc(USB_BUFFER_SIZE);
-	memset(buffer, 0x0, USB_BUFFER_SIZE);
-
+	buffer = (unsigned char *)calloc(USB_BUFFER_SIZE, 1);
+	
 	// Added by USBDriver::Send
 	buffer[0] = 0;
 
@@ -444,9 +441,8 @@ static void hhkb_write_keymap(hid_device *handle, unsigned char *layout, char fn
 
 	// Allocate buffer for communications
 	unsigned char *buffer;
-	buffer = (unsigned char *)malloc(USB_BUFFER_SIZE);
-	memset(buffer, 0x0, USB_BUFFER_SIZE);
-
+	buffer = (unsigned char *)calloc(USB_BUFFER_SIZE, 1);
+	
 	// Added by USBDriver::Send
 	buffer[0] = 0;
 
@@ -476,7 +472,6 @@ static void hhkb_write_keymap(hid_device *handle, unsigned char *layout, char fn
 	free(buffer);
 
 	buffer = hhkb_read(handle);
-
 	if (verbose_log) {
 		printf("debug: WRITE_KEYMAP(1) ");
 		for (int i = 0; i < 6; i++)
@@ -488,9 +483,7 @@ static void hhkb_write_keymap(hid_device *handle, unsigned char *layout, char fn
 	free(buffer);
 
 	// Second pass
-	buffer = (unsigned char *)malloc(USB_BUFFER_SIZE);
-	memset(buffer, 0x0, USB_BUFFER_SIZE);
-
+	buffer = (unsigned char *)calloc(USB_BUFFER_SIZE, 1);
 	buffer[0] = 0;
 	buffer[1] = 170;
 	buffer[2] = 170;
@@ -506,7 +499,6 @@ static void hhkb_write_keymap(hid_device *handle, unsigned char *layout, char fn
 	free(buffer);
 
 	buffer = hhkb_read(handle);
-
 	if (verbose_log) {
 		printf("debug: WRITE_KEYMAP(2) ");
 		for (int i = 0; i < 6; i++)
@@ -518,9 +510,7 @@ static void hhkb_write_keymap(hid_device *handle, unsigned char *layout, char fn
 	free(buffer);
 
 	// Third pass
-	buffer = (unsigned char *)malloc(USB_BUFFER_SIZE);
-	memset(buffer, 0x0, USB_BUFFER_SIZE);
-
+	buffer = (unsigned char *)calloc(USB_BUFFER_SIZE, 1);
 	buffer[0] = 0;
 	buffer[1] = 170;
 	buffer[2] = 170;
@@ -536,7 +526,6 @@ static void hhkb_write_keymap(hid_device *handle, unsigned char *layout, char fn
 	free(buffer);
 
 	buffer = hhkb_read(handle);
-
 	if (verbose_log) {
 		printf("debug: WRITE_KEYMAP(3) ");
 		for (int i = 0; i < 6; i++)
@@ -906,16 +895,15 @@ static void hhkb_dump_firmware(hid_device *handle)
 	// Save firmware data to file
 	FILE *f = fopen(filename, "wb");
 	if (!f || !fwrite(data, size, 1, f)) {
-		printf("error: failed to data write to disk\n");
+		printf("error: failed to write data to disk\n");
 		hhkb_quit(handle);
 	}
 	fclose(f);
 
-	// Print result
-	printf("%i bytes written to %s\n", size, filename);
-
-	// Free buffers
+	// Clean up buffers
 	free(buffer);
 	free(info);
 	free(data);
+
+	printf("%i bytes written to %s\n", size, filename);
 }
