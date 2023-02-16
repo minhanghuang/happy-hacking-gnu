@@ -15,7 +15,17 @@ enum {
 	RESET_DIPSW = 7,
 	WRITE_KEYMAP = 134,
 	GET_KEYMAP = 135,
-	DUMP_FIRMWARE = 208
+	DUMP_FIRMWARE = 208,
+	FIRMUP_MODE_CHANGE = 224,
+	FIRMUP_START = 225,
+	FIRMUP_SEND = 226,
+	FIRMUP_END = 227,
+	// Warning: These are scary as they can modify bank 1, which could
+	// completely brick your controller, use at your own risk.
+	UPDATEBOOT_MODE_CHANGE = 228,
+	UPDATEBOOT_START = 229,
+	UPDATEBOOT_SEND = 230,
+	UPDATEBOOT_END = 231
 };
 
 // Struct for GET_KEYBOARD_INFO
@@ -34,6 +44,12 @@ typedef struct {
 	// This value is zero if running on AppFirm, and one if the board is using BootFirm
 	char runningfirmware;
 } hhkb_info;
+
+typedef struct {
+	char crc16[2];
+	unsigned char *raw_data;
+	int file_size;
+} hhkb_firmware;
 
 static void hhkb_notify_application_state(hid_device *handle, unsigned char open)
 {
@@ -399,7 +415,7 @@ static void hhkb_reset_dipsw(hid_device *handle)
 	// Allocate buffer for communications
 	unsigned char *buffer;
 	buffer = (unsigned char *)calloc(USB_BUFFER_SIZE, 1);
-	
+
 	// Added by USBDriver::Send
 	buffer[0] = 0;
 
@@ -442,7 +458,7 @@ static void hhkb_write_keymap(hid_device *handle, unsigned char *layout, char fn
 	// Allocate buffer for communications
 	unsigned char *buffer;
 	buffer = (unsigned char *)calloc(USB_BUFFER_SIZE, 1);
-	
+
 	// Added by USBDriver::Send
 	buffer[0] = 0;
 
@@ -851,7 +867,7 @@ static void hhkb_dump_firmware(hid_device *handle)
 	buffer = (unsigned char *)calloc(USB_BUFFER_SIZE, 1);
 
 	// Allocate firmware data array
-	data = (unsigned char *)calloc(256000, 1);
+	data = (unsigned char *)calloc(300000, 1);
 
 	// Added by USBDriver::Send
 	buffer[0] = 0;
@@ -860,7 +876,7 @@ static void hhkb_dump_firmware(hid_device *handle)
 	buffer[1] = 170;
 	buffer[2] = 170;
 
-	// Request index
+	// Command ID
 	buffer[3] = DUMP_FIRMWARE;
 
 	// Write to HID device
@@ -890,6 +906,9 @@ static void hhkb_dump_firmware(hid_device *handle)
 		// Copy firmware data to buffer
 		memcpy(data + size, buffer + 8, read);
 		size += read;
+
+		// Free buffer
+		free(buffer);
 	} while (read >= 56);
 
 	// Save firmware data to file
@@ -901,9 +920,253 @@ static void hhkb_dump_firmware(hid_device *handle)
 	fclose(f);
 
 	// Clean up buffers
-	free(buffer);
 	free(info);
 	free(data);
 
-	printf("%i bytes written to %s\n", size, filename);
+	printf("Success (wrote %i bytes to %s)\n", size, filename);
+}
+
+static void hhkb_firmup_mode_change(hid_device *handle)
+{
+	unsigned char *buffer;
+
+	// Write to HID device
+	hhkb_write(handle, FIRMUP_MODE_CHANGE);
+
+	// Read response from device
+	buffer = hhkb_read(handle);
+
+	// Debug log
+	if (verbose_log) {
+		printf("debug: FIRMUP_MODE_CHANGE ");
+		for (int i = 0; i < 6; i++)
+			printf("0x%02X ", buffer[i]);
+
+		printf("\n");
+	}
+
+	// Free read buffer
+	free(buffer);
+}
+
+static void hhkb_firmup_end(hid_device *handle)
+{
+	unsigned char *buffer;
+
+	// Write to HID device
+	hhkb_write(handle, FIRMUP_END);
+
+	// Read response from device
+	buffer = hhkb_read(handle);
+
+	// Debug log
+	if (verbose_log) {
+		printf("debug: FIRMUP_END ");
+		for (int i = 0; i < 6; i++)
+			printf("0x%02X ", buffer[i]);
+
+		printf("\n");
+	}
+
+	// Free read buffer
+	free(buffer);
+}
+
+static void hhkb_firmup_start(hid_device *handle, hhkb_firmware *data)
+{
+	// Allocate buffer for communications
+	unsigned char *buffer;
+	buffer = (unsigned char *)calloc(USB_BUFFER_SIZE, 1);
+
+	// Added by USBDriver::Send
+	buffer[0] = 0;
+
+	// 170 is used in buffer[1] and buffer[2] for all requests
+	buffer[1] = 170;
+	buffer[2] = 170;
+
+	// Command ID
+	buffer[3] = FIRMUP_START;
+
+	// Unknown
+	buffer[4] = 0;
+	buffer[5] = 8;
+
+	// Firmware size
+	memcpy(&buffer[6], &data->file_size, 4);
+
+	// CRC
+	memcpy(&buffer[10], &data->crc16, 2);
+
+	// Write to HID device and discard buffer
+	hhkb_write_buf(handle, buffer);
+	free(buffer);
+
+	// Read response from device
+	buffer = hhkb_read(handle);
+
+	// Debug log
+	if (verbose_log) {
+		printf("debug: FIRMUP_START ");
+		for (int i = 0; i < 6; i++)
+			printf("0x%02X ", buffer[i]);
+
+		printf("\n");
+	}
+
+	// Free buffer
+	free(buffer);
+}
+
+static void hhkb_firmup_send(hid_device *handle, hhkb_firmware *fw)
+{
+	unsigned char *buffer;
+	unsigned char *data;
+	unsigned short packet_num;
+	int firmware_size;
+	int packet_count;
+	int total_sent;
+	int write_len;
+
+	// Skip the first two bytes, as they are only verified by
+	// the keymap tool, and not part of the actual firmware
+	firmware_size = fw->file_size - 2;
+	data = fw->raw_data + 2;
+
+	// Calculate how many total packets are needed
+	packet_count = (firmware_size + 57 - 1) / 57;
+	total_sent = 0;
+
+	for (packet_num = 0; packet_num < packet_count; packet_num++) {
+		// Number of bytes that fit in a single packet
+		write_len = 57;
+
+		// Only send the last bit if we're at the end
+		if (firmware_size - total_sent < 57)
+			write_len = firmware_size - total_sent;
+
+		// Allocate buffer to send data
+		buffer = calloc(USB_BUFFER_SIZE, 1);
+		
+		// Added by USBDriver::Send
+		buffer[0] = 0;
+
+		// 170 is used in buffer[1] and buffer[2] for all requests
+		buffer[1] = 170;
+		buffer[2] = 170;
+
+		// Command ID
+		buffer[3] = FIRMUP_SEND;
+
+		// How many bytes are in the packet
+		buffer[5] = write_len + 2;
+
+		// Expected packet number
+		memcpy(&buffer[6], &packet_num, 2);
+
+		// Copy binary data
+		memcpy(&buffer[8], data + total_sent, write_len);
+
+		// Write to HID device and discard buffer
+		hhkb_write_buf(handle, buffer);
+		free(buffer);
+
+		// Read from HID device
+		buffer = hhkb_read(handle);
+
+		// Debug log
+		if (verbose_log) {
+			printf("debug: FIRMUP_SEND(%i) ", packet_num);
+			for (int i = 0; i < 6; i++)
+				printf("0x%02X ", buffer[i]);
+			printf("\n");
+		}
+
+		// Keep track of data sent so far
+		total_sent += write_len;
+
+		// Check for write errors
+		if (*(unsigned short *)&buffer[6] != packet_num) {
+			printf("error: unable to send firmware during update\n");
+			hhkb_quit(handle);
+		}
+
+		// Free read buffer
+		free(buffer);
+	}
+
+}
+
+static hhkb_firmware *hhkb_load_firmware(hid_device *handle, const char *path)
+{
+	hhkb_firmware *fw;
+
+	// Load firmware data from file
+	FILE *f = fopen(path, "r");
+	if (!f) {
+		printf("error: unable to open firmware file\n");
+		hhkb_quit(handle);
+	}
+
+	// Allocate struct for firmware data
+	fw = calloc(sizeof(hhkb_firmware), 1);
+
+	// Get file size
+	fseek(f, 0L, SEEK_END);
+	fw->file_size = ftell(f);
+	rewind(f);
+
+	// Allocate buffer for firmware file
+	fw->raw_data = (unsigned char *)calloc(fw->file_size, 1);
+
+	// Read firmware into buffer
+	if (!fw->file_size || !fread(fw->raw_data, fw->file_size, 1, f)) {
+		printf("error: unable to read firmware file\n");
+		hhkb_quit(handle);
+	}
+
+	// Copy CRC from firmware file
+	memcpy(&fw->crc16, fw->raw_data, 2);
+
+	fclose(f);
+	return fw;
+}
+
+static void hhkb_firmup(hid_device *handle, const char *path)
+{
+	hhkb_firmware *data;
+
+	// Load firmware from file
+	data = hhkb_load_firmware(handle, path);
+
+	// Notify the device that the Keymap Tool is running
+	hhkb_notify_application_state(handle, 1);
+
+	// Enter firmware update mode
+	hhkb_firmup_mode_change(handle);
+
+	// Reopen handle to device, as entering firmware update mode
+	// closes the current handle and reconnects the HID device
+	hid_close(handle);
+	sleep(4000);
+	handle = hhkb_init();
+
+	printf("Installing firmware...\n");
+
+	// Start firmware update
+	hhkb_firmup_start(handle, data);
+
+	// Send firmware data
+	hhkb_firmup_send(handle, data);
+
+	// End firmware update
+	hhkb_firmup_end(handle);
+	printf("Success\n");
+
+	// Clean up buffers
+	free(data->raw_data);
+	free(data);
+
+	hid_close(handle);
+	exit(EXIT_SUCCESS);
 }

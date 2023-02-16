@@ -1,13 +1,6 @@
 #include "functions.h"
 #include <argparse.h>
 
-#ifdef _WIN32
-	#include <windows.h>
-#else
-	#include <unistd.h>
-	#define Sleep(x) usleep(x * 1000)
-#endif
-
 // Debug logging flag
 int verbose_log = 0;
 
@@ -36,10 +29,11 @@ int main(int argc, const char **argv)
 	int fn;
 	int key;
 	int code;
-	char fw_file[255];
+	const char *fw_file;
 
 	// Clear argument variables
-	action = fn = key = code = fw_file[0] = 0;
+	action = fn = key = code = 0;
+	fw_file = 0;
 
 	// Argument parser options
 	struct argparse_option options[] = {
@@ -70,19 +64,13 @@ int main(int argc, const char **argv)
 	// Parse arguments
 	argc = argparse_parse(&argparse, argc, argv);
 
-	// We can't do firmware stuff yet
-	if (strlen(fw_file) && action == 0) {
-		printf("error: this command isn't implemented yet\n");
-		return EXIT_FAILURE;
-	}
-
 	// Set remap flag if proper args are set
 	if (key != 0 && key <= 69 && code != 0 && code <= 0xff) {
 		action |= ACTION_REMAP;
 	}
 
 	// Show help message and quit if no args are set
-	if (action == 0) {
+	if (action == 0 && !fw_file) {
 		argparse_usage(&argparse);
 		return EXIT_FAILURE;
 	}
@@ -90,9 +78,10 @@ int main(int argc, const char **argv)
 	// Connect to device
 	hid_device *handle = hhkb_init();
 
-	// Set remap flag if proper args are set
-	if (key > 0 && key <= (hhkb_is_jis(handle) ? 69 : 60) && code > 0 && code <= 0xff) {
-		action |= ACTION_REMAP;
+	// Disallow remapping if key number is too high on non-JIS model
+	if (action & ACTION_REMAP && key > 60 && !hhkb_is_jis(handle)) {
+		argparse_usage(&argparse);
+		hhkb_quit(handle);
 	}
 
 	// Debug log
@@ -123,7 +112,7 @@ int main(int argc, const char **argv)
 
 		// Check input text
 		if (!strcmp(str, "reset\n")) {
-			Sleep(1000);
+			sleep(1000);
 			hhkb_reset_to_factory_default(handle);
 		} else {
 			printf("Aborting..\n");
@@ -144,7 +133,7 @@ int main(int argc, const char **argv)
 
 		// Check input text
 		if (!strcmp(str, "confirm\n")) {
-			Sleep(1000);
+			sleep(1000);
 			hhkb_remap_key(handle, key, code, fn);
 		} else {
 			printf("Aborting..\n");
@@ -152,13 +141,27 @@ int main(int argc, const char **argv)
 	}
 	else if (action & ACTION_DUMP_FW) {
 		// Confirm operation
-		printf("This operation will take a couple of minutes, during which the keyboard will not be functional.\nPlease type 'confirm' to continue: ");
+		printf("This operation can take up to 5 minutes, during which the keyboard will not be functional.\nPlease type 'confirm' to continue: ");
 		char str[10];
 		fgets(str, 10, stdin);
 
 		// Check input text
 		if (!strcmp(str, "confirm\n")) {
+			printf("Dumping firmware...\n");
 			hhkb_dump_firmware(handle);
+		} else {
+			printf("Aborting..\n");
+		}
+	}
+	else if (strlen(fw_file)) {
+		// Confirm operation
+		printf("Updating the firmware will take a couple of minutes, during which the keyboard will not be functional.\nPlease type 'confirm' to continue: ");
+		char str[10];
+		fgets(str, 10, stdin);
+
+		// Check input text
+		if (!strcmp(str, "confirm\n")) {
+			hhkb_firmup(handle, fw_file);
 		} else {
 			printf("Aborting..\n");
 		}

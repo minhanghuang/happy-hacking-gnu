@@ -7,8 +7,7 @@ A free, open-source alternative to the HHKB Keymap Tool provided by PFU.
 | Read keyboard information   |  Yes      |  -      |
 | Reset factory defaults      |  Yes      |  -      |
 | Dump firmware               |  Yes      |  -      |
-| Update firmware             |  No       |  Yes    |
-| Full GUI layout editor      |  No       |  Yes    |
+| Update firmware             |  Yes      |  -      |
 
 ## Building
 The only build dependencies are `cmake` and `libudev`, all other dependencies are included in the source tree. 

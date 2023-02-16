@@ -6,6 +6,14 @@
 
 #define USB_BUFFER_SIZE 65
 
+#ifdef _WIN32
+	#include <windows.h>
+#else
+	#include <unistd.h>
+	#define sleep(x) usleep(x * 1000)
+#endif
+
+
 static hid_device *hhkb_get_programming_interface()
 {
 	struct hid_device_info *devices, *current_device;
