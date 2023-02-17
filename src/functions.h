@@ -81,7 +81,7 @@ static void hhkb_notify_application_state(hid_device *handle, unsigned char open
 
 	// Debug log
 	if (verbose_log) {
-		printf("debug: NotifyApplicationState ");
+		printf("debug: NOTIFY_APPLICATION_STATE ");
 		for (int i = 0; i < 6; i++)
 			printf("0x%02X ", buffer[i]);
 
@@ -1060,7 +1060,7 @@ static void hhkb_firmup(hid_device *handle, const char *path)
 	data = hhkb_load_firmware(handle, path);
 
 	// Notify the device that the Keymap Tool is running
-	hhkb_notify_application_state(handle, 1);
+	hhkb_notify_application_state(handle, 0);
 
 	// Enter firmware update mode
 	hhkb_firmup_mode_change(handle);
@@ -1082,6 +1082,9 @@ static void hhkb_firmup(hid_device *handle, const char *path)
 	// End firmware update
 	hhkb_firmup_end(handle);
 	printf("Success\n");
+
+	// Notify the device that the Keymap Tool is closed
+	hhkb_notify_application_state(handle, 1);
 
 	// Clean up buffers
 	free(data->raw_data);
