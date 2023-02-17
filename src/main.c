@@ -62,7 +62,7 @@ int main(int argc, const char **argv)
 	argparse_describe(&argparse, 0, "");
 
 	// Parse arguments
-	argc = argparse_parse(&argparse, argc, argv);
+	argparse_parse(&argparse, argc, argv);
 
 	// Set remap flag if proper args are set
 	if (key != 0 && key <= 69 && code != 0 && code <= 0xff) {

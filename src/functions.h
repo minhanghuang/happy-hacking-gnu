@@ -93,7 +93,6 @@ static unsigned char *hhkb_get_dip_switch_state(hid_device *handle)
 {
 	unsigned char buffer[USB_BUFFER_SIZE];
 	unsigned char *ret;
-	int i;
 
 	// Write to HID device and save response to buffer
 	hhkb_write(handle, GET_DIP_STATE);
@@ -294,7 +293,7 @@ static unsigned char *hhkb_get_layout(hid_device *handle, unsigned char with_fn)
 	// Debug log
 	if (verbose_log) {
 		printf("debug: GET_KEYMAP(1) ");
-		for (int i = 0; i < 6; i++) {
+		for (i = 0; i < 6; i++) {
 			printf("0x%02X ", buffer[i]);
 		}
 		printf("\n");
@@ -308,7 +307,7 @@ static unsigned char *hhkb_get_layout(hid_device *handle, unsigned char with_fn)
 	// Debug log
 	if (verbose_log) {
 		printf("debug: GET_KEYMAP(2) ");
-		for (int i = 0; i < 6; i++) {
+		for (i = 0; i < 6; i++) {
 			printf("0x%02X ", buffer[i]);
 		}
 		printf("\n");
@@ -322,7 +321,7 @@ static unsigned char *hhkb_get_layout(hid_device *handle, unsigned char with_fn)
 	// Debug log
 	if (verbose_log) {
 		printf("debug: GET_KEYMAP(3) ");
-		for (int i = 0; i < 6; i++) {
+		for (i = 0; i < 6; i++) {
 			printf("0x%02X ", buffer[i]);
 		}
 		printf("\n");
@@ -435,7 +434,7 @@ static void hhkb_write_keymap(hid_device *handle, unsigned char *layout, char fn
 	hhkb_read(handle, buffer);
 	if (verbose_log) {
 		printf("debug: WRITE_KEYMAP(1) ");
-		for (int i = 0; i < 6; i++)
+		for (i = 0; i < 6; i++)
 			printf("0x%02X ", buffer[i]);
 
 		printf("\n");
@@ -460,7 +459,7 @@ static void hhkb_write_keymap(hid_device *handle, unsigned char *layout, char fn
 	hhkb_read(handle, buffer);
 	if (verbose_log) {
 		printf("debug: WRITE_KEYMAP(2) ");
-		for (int i = 0; i < 6; i++)
+		for (i = 0; i < 6; i++)
 			printf("0x%02X ", buffer[i]);
 
 		printf("\n");
@@ -485,7 +484,7 @@ static void hhkb_write_keymap(hid_device *handle, unsigned char *layout, char fn
 	hhkb_read(handle, buffer);
 	if (verbose_log) {
 		printf("debug: WRITE_KEYMAP(3) ");
-		for (int i = 0; i < 6; i++)
+		for (i = 0; i < 6; i++)
 			printf("0x%02X ", buffer[i]);
 
 		printf("\n");
@@ -513,7 +512,6 @@ static void hhkb_confirm_keymap(hid_device *handle)
 static void hhkb_remap_key(hid_device *handle, unsigned char remap_key, unsigned char remap_code, char fn)
 {
 	unsigned char *layout;
-	int res;
 
 	// Notify the device that the Keymap Tool is running
 	hhkb_notify_application_state(handle, 0);
@@ -791,7 +789,6 @@ static void hhkb_dump_firmware(hid_device *handle)
 	char filename[64];
 	int size;
 	int read;
-	int i;
 
 	// Get serial number for filename
 	info = hhkb_get_info(handle);
