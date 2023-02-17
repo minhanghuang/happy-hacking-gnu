@@ -1,5 +1,6 @@
 #pragma once
 #include <hidapi.h>
+#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,11 +9,10 @@
 
 #ifdef _WIN32
 	#include <windows.h>
+	#define sleep(x) Sleep(x)
 #else
-	#include <unistd.h>
 	#define sleep(x) usleep(x * 1000)
 #endif
-
 
 static hid_device *hhkb_get_programming_interface()
 {
