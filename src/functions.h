@@ -45,6 +45,7 @@ typedef struct {
 	char runningfirmware;
 } hhkb_info;
 
+// Struct for firmware data
 typedef struct {
 	char crc16[2];
 	unsigned char *raw_data;
@@ -53,9 +54,9 @@ typedef struct {
 
 static void hhkb_notify_application_state(hid_device *handle, unsigned char open)
 {
-	// Allocate buffer for communications
-	unsigned char *buffer;
-	buffer = (unsigned char *)calloc(USB_BUFFER_SIZE, 1);
+	// Initialize buffer for communications
+	unsigned char buffer[USB_BUFFER_SIZE];
+	memset(buffer, 0, sizeof(buffer));
 
 	// Added by USBDriver::Send
 	buffer[0] = 0;
@@ -74,12 +75,9 @@ static void hhkb_notify_application_state(hid_device *handle, unsigned char open
 	// Application state (0 = open, 1 = closed)
 	buffer[6] = open;
 
-	// Write to HID device and discard buffer
+	// Write to HID device and save response to buffer
 	hhkb_write_buf(handle, buffer);
-	free(buffer);
-
-	// Read response from device
-	buffer = hhkb_read(handle);
+	hhkb_read(handle, buffer);
 
 	// Debug log
 	if (verbose_log) {
@@ -93,13 +91,13 @@ static void hhkb_notify_application_state(hid_device *handle, unsigned char open
 
 static unsigned char *hhkb_get_dip_switch_state(hid_device *handle)
 {
-	unsigned char *buffer;
+	unsigned char buffer[USB_BUFFER_SIZE];
 	unsigned char *ret;
 	int i;
 
 	// Write to HID device and save response to buffer
 	hhkb_write(handle, GET_DIP_STATE);
-	buffer = hhkb_read(handle);
+	hhkb_read(handle, buffer);
 
 	// Debug log
 	if (verbose_log) {
@@ -113,9 +111,6 @@ static unsigned char *hhkb_get_dip_switch_state(hid_device *handle)
 	// Copy result from buffer, so ReadCheck data isn't returned
 	ret = malloc(6);
 	memcpy(ret, buffer + 6, 6);
-
-	// Free read buffer
-	free(buffer);
 	return ret;
 }
 
@@ -138,14 +133,11 @@ static void hhkb_print_dip_switch_state(hid_device *handle)
 
 static unsigned char hhkb_get_keyboard_mode(hid_device *handle)
 {
-	unsigned char *buffer;
-	unsigned char ret;
+	unsigned char buffer[USB_BUFFER_SIZE];
 
 	// Write to HID device and save response to buffer
 	hhkb_write(handle, GET_KEYBOARD_MODE);
-	buffer = hhkb_read(handle);
-
-	ret = buffer[6];
+	hhkb_read(handle, buffer);
 
 	// Debug log
 	if (verbose_log) {
@@ -156,9 +148,7 @@ static unsigned char hhkb_get_keyboard_mode(hid_device *handle)
 		printf("\n");
 	}
 
-	// Free read buffer
-	free(buffer);
-	return ret;
+	return buffer[6];
 }
 
 static void hhkb_print_keyboard_mode(hid_device *handle)
@@ -187,12 +177,12 @@ static void hhkb_print_keyboard_mode(hid_device *handle)
 
 static hhkb_info *hhkb_get_info(hid_device *handle)
 {
-	unsigned char *buffer;
+	unsigned char buffer[USB_BUFFER_SIZE];
 	hhkb_info *result;
 
 	// Write to HID device and save response to buffer
 	hhkb_write(handle, GET_KEYBOARD_INFO);
-	buffer = hhkb_read(handle);
+	hhkb_read(handle, buffer);
 
 	if (verbose_log) {
 		// Debug log
@@ -206,8 +196,6 @@ static hhkb_info *hhkb_get_info(hid_device *handle)
 	result = malloc(sizeof(hhkb_info));
 	memcpy(result, buffer + 6, sizeof(hhkb_info));
 
-	// Free read buffer
-	free(buffer);
 	return result;
 }
 
@@ -234,68 +222,44 @@ static void hhkb_print_info(hid_device *handle)
 
 static int hhkb_is_jis(hid_device *handle)
 {
-	unsigned char *buffer;
-	char model[64];
+	hhkb_info *info;
+	int ret;
 
-	// Write to HID device and save response to buffer
-	hhkb_write(handle, GET_KEYBOARD_INFO);
-	buffer = hhkb_read(handle);
-
-	if (verbose_log) {
-		// Debug log
-		printf("debug: GET_KEYBOARD_INFO ");
-		for (int i = 0; i < 6; i++) {
-			printf("0x%02X ", buffer[i]);
-		}
-		printf("\n");
-	}
-
-	// Get model string from buffer
-	memcpy(model, buffer + 6, 20);
-
-	// Free read buffer
-	free(buffer);
+	// Get keyboard information
+	info = hhkb_get_info(handle);
 
 	// All japanese models are PD-KBx20xx
-	return !!strstr(model, "20");
+	ret = !!strstr(info->type_number, "20");
+
+	// Free info buffer
+	free(info);
+	return ret;
 }
 
 static int hhkb_is_hybrid(hid_device *handle)
 {
-	unsigned char *buffer;
-	char model[64];
+	hhkb_info *info;
+	int ret;
 
-	// Write to HID device and save response to buffer
-	hhkb_write(handle, GET_KEYBOARD_INFO);
-	buffer = hhkb_read(handle);
-
-	if (verbose_log) {
-		// Debug log
-		printf("debug: GET_KEYBOARD_INFO ");
-		for (int i = 0; i < 6; i++) {
-			printf("0x%02X ", buffer[i]);
-		}
-		printf("\n");
-	}
-
-	// Get model string from buffer
-	memcpy(model, buffer + 6, 20);
-
-	// Free read buffer
-	free(buffer);
+	// Get keyboard information
+	info = hhkb_get_info(handle);
 
 	// Hybrid models are PD-KB800xx, PD-KB820xx depending on exact model
-	return !!strstr(model, "KB8");
+	ret = !!strstr(info->type_number, "KB8");
+
+	// Free info buffer
+	free(info);
+	return ret;
 }
 
 static unsigned char *hhkb_get_layout(hid_device *handle, unsigned char with_fn)
 {
-	unsigned char *buffer;
+	unsigned char buffer[USB_BUFFER_SIZE];
 	unsigned char *layout;
 	int i;
 
-	// Allocate buffer for communication
-	buffer = (unsigned char *)calloc(USB_BUFFER_SIZE, 1);
+	// Initialize buffer for communications
+	memset(buffer, 0, sizeof(buffer));
 
 	// Allocate layout array
 	layout = (unsigned char *)calloc(128, 1);
@@ -321,10 +285,9 @@ static unsigned char *hhkb_get_layout(hid_device *handle, unsigned char with_fn)
 
 	// Write to HID device
 	hhkb_write_buf(handle, buffer);
-	free(buffer);
 
 	// First read
-	buffer = hhkb_read(handle);
+	hhkb_read(handle, buffer);
 	for (i = 0; i < 58; i++)
 		layout[i] = buffer[6 + i];
 
@@ -337,11 +300,8 @@ static unsigned char *hhkb_get_layout(hid_device *handle, unsigned char with_fn)
 		printf("\n");
 	}
 
-	// Free read buffer
-	free(buffer);
-
 	// Second read
-	buffer = hhkb_read(handle);
+	hhkb_read(handle, buffer);
 	for (i = 0; i < 58; i++)
 		layout[i + 58] = buffer[6 + i];
 
@@ -354,11 +314,8 @@ static unsigned char *hhkb_get_layout(hid_device *handle, unsigned char with_fn)
 		printf("\n");
 	}
 
-	// Free read buffer
-	free(buffer);
-
 	// Third read
-	buffer = hhkb_read(handle);
+	hhkb_read(handle, buffer);
 	for (i = 0; i < 12; i++)
 		layout[i + 116] = buffer[6 + i];
 
@@ -371,20 +328,17 @@ static unsigned char *hhkb_get_layout(hid_device *handle, unsigned char with_fn)
 		printf("\n");
 	}
 
-	// Free read buffer
-	free(buffer);
-
 	// Return complete array
 	return layout;
 }
 
 static void hhkb_reset_to_factory_default(hid_device *handle)
 {
-	unsigned char *buffer;
+	unsigned char buffer[USB_BUFFER_SIZE];
 
 	// Write to HID device and save response to buffer
 	hhkb_write(handle, RESET_FACTORY_DEFAULTS);
-	buffer = hhkb_read(handle);
+	hhkb_read(handle, buffer);
 
 	// Debug log
 	if (verbose_log) {
@@ -405,16 +359,13 @@ static void hhkb_reset_to_factory_default(hid_device *handle)
 		}
 		printf("\n");
 	}
-
-	// Free read buffer
-	free(buffer);
 }
 
 static void hhkb_reset_dipsw(hid_device *handle)
 {
-	// Allocate buffer for communications
-	unsigned char *buffer;
-	buffer = (unsigned char *)calloc(USB_BUFFER_SIZE, 1);
+	// Initialize buffer for communications
+	unsigned char buffer[USB_BUFFER_SIZE];
+	memset(buffer, 0, sizeof(buffer));
 
 	// Added by USBDriver::Send
 	buffer[0] = 0;
@@ -432,32 +383,26 @@ static void hhkb_reset_dipsw(hid_device *handle)
 
 	hhkb_write_buf(handle, buffer);
 
-	// Free write buffer
-	free(buffer);
-
 	// Read response
-	buffer = hhkb_read(handle);
+	hhkb_read(handle, buffer);
 
+	// Debug log
 	if (verbose_log) {
-		// Print result
 		printf("debug: RESET_DIPSW ");
 		for (int i = 0; i < 6; i++) {
 			printf("0x%02X ", buffer[i]);
 		}
 		printf("\n");
 	}
-
-	// Free read buffer
-	free(buffer);
 }
 
 static void hhkb_write_keymap(hid_device *handle, unsigned char *layout, char fn)
 {
 	int i;
 
-	// Allocate buffer for communications
-	unsigned char *buffer;
-	buffer = (unsigned char *)calloc(USB_BUFFER_SIZE, 1);
+	// Initialize buffer for communications
+	unsigned char buffer[USB_BUFFER_SIZE];
+	memset(buffer, 0, sizeof(buffer));
 
 	// Added by USBDriver::Send
 	buffer[0] = 0;
@@ -485,9 +430,9 @@ static void hhkb_write_keymap(hid_device *handle, unsigned char *layout, char fn
 
 	// Write first pass
 	hhkb_write_buf(handle, buffer);
-	free(buffer);
 
-	buffer = hhkb_read(handle);
+	// Read response
+	hhkb_read(handle, buffer);
 	if (verbose_log) {
 		printf("debug: WRITE_KEYMAP(1) ");
 		for (int i = 0; i < 6; i++)
@@ -496,10 +441,8 @@ static void hhkb_write_keymap(hid_device *handle, unsigned char *layout, char fn
 		printf("\n");
 	}
 
-	free(buffer);
-
 	// Second pass
-	buffer = (unsigned char *)calloc(USB_BUFFER_SIZE, 1);
+	memset(buffer, 0, sizeof(buffer));
 	buffer[0] = 0;
 	buffer[1] = 170;
 	buffer[2] = 170;
@@ -512,9 +455,9 @@ static void hhkb_write_keymap(hid_device *handle, unsigned char *layout, char fn
 
 	// Write second pass
 	hhkb_write_buf(handle, buffer);
-	free(buffer);
 
-	buffer = hhkb_read(handle);
+	// Read response
+	hhkb_read(handle, buffer);
 	if (verbose_log) {
 		printf("debug: WRITE_KEYMAP(2) ");
 		for (int i = 0; i < 6; i++)
@@ -523,10 +466,8 @@ static void hhkb_write_keymap(hid_device *handle, unsigned char *layout, char fn
 		printf("\n");
 	}
 
-	free(buffer);
-
 	// Third pass
-	buffer = (unsigned char *)calloc(USB_BUFFER_SIZE, 1);
+	memset(buffer, 0, sizeof(buffer));
 	buffer[0] = 0;
 	buffer[1] = 170;
 	buffer[2] = 170;
@@ -539,9 +480,9 @@ static void hhkb_write_keymap(hid_device *handle, unsigned char *layout, char fn
 
 	// Write third pass
 	hhkb_write_buf(handle, buffer);
-	free(buffer);
 
-	buffer = hhkb_read(handle);
+	// Read response
+	hhkb_read(handle, buffer);
 	if (verbose_log) {
 		printf("debug: WRITE_KEYMAP(3) ");
 		for (int i = 0; i < 6; i++)
@@ -549,18 +490,17 @@ static void hhkb_write_keymap(hid_device *handle, unsigned char *layout, char fn
 
 		printf("\n");
 	}
-
-	free(buffer);
 }
 
 static void hhkb_confirm_keymap(hid_device *handle)
 {
-	unsigned char *buffer;
+	unsigned char buffer[USB_BUFFER_SIZE];
 
 	// Confirm keymap
 	hhkb_write(handle, CONFIRM_KEYMAP);
-	buffer = hhkb_read(handle);
+	hhkb_read(handle, buffer);
 
+	// Debug log
 	if (verbose_log) {
 		printf("debug: CONFIRM_KEYMAP ");
 		for (int i = 0; i < 6; i++) {
@@ -568,16 +508,12 @@ static void hhkb_confirm_keymap(hid_device *handle)
 		}
 		printf("\n");
 	}
-
-	free(buffer);
 }
 
 static void hhkb_remap_key(hid_device *handle, unsigned char remap_key, unsigned char remap_code, char fn)
 {
-	unsigned char *buffer;
 	unsigned char *layout;
 	int res;
-	int i;
 
 	// Notify the device that the Keymap Tool is running
 	hhkb_notify_application_state(handle, 0);
@@ -849,13 +785,13 @@ static void hhkb_print_layout_jis(hid_device *handle, int fn_layer)
 
 static void hhkb_dump_firmware(hid_device *handle)
 {
-	unsigned char *buffer;
+	hhkb_info *info;
+	unsigned char buffer[USB_BUFFER_SIZE];
 	unsigned char *data;
 	char filename[64];
 	int size;
 	int read;
 	int i;
-	hhkb_info *info;
 
 	// Get serial number for filename
 	info = hhkb_get_info(handle);
@@ -863,8 +799,8 @@ static void hhkb_dump_firmware(hid_device *handle)
 	// Format filename for firmware
 	sprintf(filename, "%s.BIN", info->serial);
 
-	// Allocate buffer for communication
-	buffer = (unsigned char *)calloc(USB_BUFFER_SIZE, 1);
+	// Initialize buffer for communications
+	memset(buffer, 0, sizeof(buffer));
 
 	// Allocate firmware data array
 	data = (unsigned char *)calloc(300000, 1);
@@ -879,9 +815,9 @@ static void hhkb_dump_firmware(hid_device *handle)
 	// Command ID
 	buffer[3] = DUMP_FIRMWARE;
 
-	// Write to HID device
+	// Write to HID device and clear buffer
 	hhkb_write_buf(handle, buffer);
-	free(buffer);
+	memset(buffer, 0, sizeof(buffer));
 
 	// Total read bytes
 	size = 0;
@@ -889,7 +825,7 @@ static void hhkb_dump_firmware(hid_device *handle)
 	// Read loop
 	do {
 		// Save response to buffer
-		buffer = hhkb_read(handle);
+		hhkb_read(handle, buffer);
 
 		// Debug log
 		if (verbose_log) {
@@ -906,9 +842,6 @@ static void hhkb_dump_firmware(hid_device *handle)
 		// Copy firmware data to buffer
 		memcpy(data + size, buffer + 8, read);
 		size += read;
-
-		// Free buffer
-		free(buffer);
 	} while (read >= 56);
 
 	// Save firmware data to file
@@ -928,13 +861,13 @@ static void hhkb_dump_firmware(hid_device *handle)
 
 static void hhkb_firmup_mode_change(hid_device *handle)
 {
-	unsigned char *buffer;
+	unsigned char buffer[USB_BUFFER_SIZE];
 
 	// Write to HID device
 	hhkb_write(handle, FIRMUP_MODE_CHANGE);
 
 	// Read response from device
-	buffer = hhkb_read(handle);
+	hhkb_read(handle, buffer);
 
 	// Debug log
 	if (verbose_log) {
@@ -944,20 +877,19 @@ static void hhkb_firmup_mode_change(hid_device *handle)
 
 		printf("\n");
 	}
-
-	// Free read buffer
-	free(buffer);
 }
 
 static void hhkb_firmup_end(hid_device *handle)
 {
-	unsigned char *buffer;
+	// Initialize buffer for communications
+	unsigned char buffer[USB_BUFFER_SIZE];
+	memset(buffer, 0, sizeof(buffer));
 
 	// Write to HID device
 	hhkb_write(handle, FIRMUP_END);
 
 	// Read response from device
-	buffer = hhkb_read(handle);
+	hhkb_read(handle, buffer);
 
 	// Debug log
 	if (verbose_log) {
@@ -967,16 +899,13 @@ static void hhkb_firmup_end(hid_device *handle)
 
 		printf("\n");
 	}
-
-	// Free read buffer
-	free(buffer);
 }
 
 static void hhkb_firmup_start(hid_device *handle, hhkb_firmware *data)
 {
-	// Allocate buffer for communications
-	unsigned char *buffer;
-	buffer = (unsigned char *)calloc(USB_BUFFER_SIZE, 1);
+	// Initialize buffer for communications
+	unsigned char buffer[USB_BUFFER_SIZE];
+	memset(buffer, 0, sizeof(buffer));
 
 	// Added by USBDriver::Send
 	buffer[0] = 0;
@@ -998,12 +927,11 @@ static void hhkb_firmup_start(hid_device *handle, hhkb_firmware *data)
 	// CRC
 	memcpy(&buffer[10], &data->crc16, 2);
 
-	// Write to HID device and discard buffer
+	// Write to HID device
 	hhkb_write_buf(handle, buffer);
-	free(buffer);
 
 	// Read response from device
-	buffer = hhkb_read(handle);
+	hhkb_read(handle, buffer);
 
 	// Debug log
 	if (verbose_log) {
@@ -1013,20 +941,22 @@ static void hhkb_firmup_start(hid_device *handle, hhkb_firmware *data)
 
 		printf("\n");
 	}
-
-	// Free buffer
-	free(buffer);
 }
 
 static void hhkb_firmup_send(hid_device *handle, hhkb_firmware *fw)
 {
-	unsigned char *buffer;
+	unsigned char write_buffer[USB_BUFFER_SIZE];
+	unsigned char read_buffer[USB_BUFFER_SIZE];
 	unsigned char *data;
 	unsigned short packet_num;
 	int firmware_size;
 	int packet_count;
 	int total_sent;
 	int write_len;
+
+	// Initialize arrays
+	memset(write_buffer, 0, sizeof(write_buffer));
+	memset(read_buffer, 0, sizeof(read_buffer));
 
 	// Skip the first two bytes, as they are only verified by
 	// the keymap tool, and not part of the actual firmware
@@ -1037,6 +967,16 @@ static void hhkb_firmup_send(hid_device *handle, hhkb_firmware *fw)
 	packet_count = (firmware_size + 57 - 1) / 57;
 	total_sent = 0;
 
+	// Added by USBDriver::Send
+	write_buffer[0] = 0;
+
+	// 170 is used in buffer[1] and buffer[2] for all requests
+	write_buffer[1] = 170;
+	write_buffer[2] = 170;
+
+	// Command ID
+	write_buffer[3] = FIRMUP_SEND;
+
 	for (packet_num = 0; packet_num < packet_count; packet_num++) {
 		// Number of bytes that fit in a single packet
 		write_len = 57;
@@ -1045,40 +985,27 @@ static void hhkb_firmup_send(hid_device *handle, hhkb_firmware *fw)
 		if (firmware_size - total_sent < 57)
 			write_len = firmware_size - total_sent;
 
-		// Allocate buffer to send data
-		buffer = calloc(USB_BUFFER_SIZE, 1);
-		
-		// Added by USBDriver::Send
-		buffer[0] = 0;
-
-		// 170 is used in buffer[1] and buffer[2] for all requests
-		buffer[1] = 170;
-		buffer[2] = 170;
-
-		// Command ID
-		buffer[3] = FIRMUP_SEND;
-
 		// How many bytes are in the packet
-		buffer[5] = write_len + 2;
+		write_buffer[5] = write_len + 2;
 
 		// Expected packet number
-		memcpy(&buffer[6], &packet_num, 2);
+		memcpy(&write_buffer[6], &packet_num, 2);
 
 		// Copy binary data
-		memcpy(&buffer[8], data + total_sent, write_len);
+		memcpy(&write_buffer[8], data + total_sent, write_len);
 
-		// Write to HID device and discard buffer
-		hhkb_write_buf(handle, buffer);
-		free(buffer);
+		// Write to HID device and clear data in buffer
+		hhkb_write_buf(handle, write_buffer);
+		memset(write_buffer + 8, 0, 57);
 
 		// Read from HID device
-		buffer = hhkb_read(handle);
+		hhkb_read(handle, read_buffer);
 
 		// Debug log
 		if (verbose_log) {
 			printf("debug: FIRMUP_SEND(%i) ", packet_num);
 			for (int i = 0; i < 6; i++)
-				printf("0x%02X ", buffer[i]);
+				printf("0x%02X ", read_buffer[i]);
 			printf("\n");
 		}
 
@@ -1086,15 +1013,11 @@ static void hhkb_firmup_send(hid_device *handle, hhkb_firmware *fw)
 		total_sent += write_len;
 
 		// Check for write errors
-		if (*(unsigned short *)&buffer[6] != packet_num) {
+		if (*(unsigned short *)&read_buffer[6] != packet_num) {
 			printf("error: unable to send firmware during update\n");
 			hhkb_quit(handle);
 		}
-
-		// Free read buffer
-		free(buffer);
 	}
-
 }
 
 static hhkb_firmware *hhkb_load_firmware(hid_device *handle, const char *path)

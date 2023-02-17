@@ -123,12 +123,8 @@ static void hhkb_write_buf(hid_device *handle, unsigned char *buffer)
 	}
 }
 
-static unsigned char *hhkb_read(hid_device *handle)
+static unsigned char *hhkb_read(hid_device *handle, unsigned char *buffer)
 {
-	// Allocate read buffer
-	unsigned char *buffer;
-	buffer = (unsigned char *)malloc(USB_BUFFER_SIZE);
-
 	// Read from device
 	if (hid_read(handle, buffer, USB_BUFFER_SIZE) < 0) {
 		printf("error: unable to read from HID device (%ls)\n", hid_error(handle));
