@@ -331,6 +331,13 @@ static unsigned char *hhkb_get_layout(hid_device *handle, unsigned char with_fn)
 	return layout;
 }
 
+static unsigned char hhkb_get_scancode(hid_device *handle, unsigned char remap_key)
+{
+	// Fetch the first layer scancode assigned to remap_key
+	unsigned char *layout = hhkb_get_layout(handle, 0);
+	return layout[remap_key];
+}
+
 static void hhkb_reset_to_factory_default(hid_device *handle)
 {
 	unsigned char buffer[USB_BUFFER_SIZE];
