@@ -130,11 +130,14 @@ int main(int argc, const char **argv)
 		}
 	}
 	else if (action & ACTION_REMAP) {
-		// Hybrid models reserve FN+Q for pairing
+		// Hybrid models reserve FN+Q, FN+CTRL and FN+RSHIFT
 		// FN+Z and FN+X are technically reserved as well, but can be remapped fine excluding media keys
-		if (hhkb_is_hybrid(handle) && fn && (hhkb_is_jis(handle) ? key == 53 : key == 44)) {
-			printf("error: FN+Q is reserved for bluetooth pairing on hybrid models\n");
-			hhkb_quit(handle);
+		if (hhkb_is_hybrid(handle) && fn) {
+			unsigned char old_code = hhkb_get_scancode(handle, key);
+			if (old_code == 0x14 || old_code == 0xe0 || old_code == 0xe5) {
+				printf("error: function layer of key is reserved on hybrid models while assigned to 0x%x\n", old_code);
+				hhkb_quit(handle);
+			}
 		}
 
 		// Confirm operation
