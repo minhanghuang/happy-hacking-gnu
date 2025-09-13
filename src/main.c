@@ -3,6 +3,8 @@
 
 // Debug logging flag
 int verbose_log = 0;
+//Skip confirmation flag
+int skip_confirmation = 0;
 
 // Usage prompt for argparse
 static const char *const usage[] = {
@@ -39,6 +41,7 @@ int main(int argc, const char **argv)
 	struct argparse_option options[] = {
 		OPT_HELP(),
 		OPT_BOOLEAN('v', "verbose", &verbose_log, "show debug messages"),
+		OPT_BOOLEAN(0, "skip-confirmation", &skip_confirmation, "Skip all user confirmations"),
 		OPT_GROUP("Basic options"),
 		OPT_BIT('i', "info", &action, "print keyboard information", NULL, ACTION_INFO),
 		OPT_BIT('d', "dip", &action, "print dipswitch state", NULL, ACTION_DIP),
@@ -105,17 +108,22 @@ int main(int argc, const char **argv)
 			hhkb_print_layout_ansi(handle, fn);
 	}
 	else if (action & ACTION_FACTORY_RESET) {
-		// Confirm operation
-		printf("Are you sure you want to restore factory defaults?\nPlease type 'reset' to continue: ");
-		char str[10];
-		fgets(str, 10, stdin);
+		if (!skip_confirmation) {
+			// Confirm operation
+			printf("Are you sure you want to restore factory defaults?\nPlease type 'reset' to continue: ");
+			char str[10];
+			fgets(str, 10, stdin);
 
-		// Check input text
-		if (!strcmp(str, "reset\n")) {
+			// Check input text
+			if (!strcmp(str, "reset\n")) {
+				sleep(1000);
+				hhkb_reset_to_factory_default(handle);
+			} else {
+				printf("Aborting..\n");
+			}
+		} else {
 			sleep(1000);
 			hhkb_reset_to_factory_default(handle);
-		} else {
-			printf("Aborting..\n");
 		}
 	}
 	else if (action & ACTION_REMAP) {
@@ -129,44 +137,58 @@ int main(int argc, const char **argv)
 			}
 		}
 
-		// Confirm operation
-		printf("Are you sure you want to assign 0x%02X to %i?\nPlease type 'confirm' to continue: ", code, key);
-		char str[10];
-		fgets(str, 10, stdin);
+		if (!skip_confirmation) {
+			// Confirm operation
+			printf("Are you sure you want to assign 0x%02X to %i?\nPlease type 'confirm' to continue: ", code, key);
+			char str[10];
+			fgets(str, 10, stdin);
 
-		// Check input text
-		if (!strcmp(str, "confirm\n")) {
+			// Check input text
+			if (!strcmp(str, "confirm\n")) {
+				sleep(1000);
+				hhkb_remap_key(handle, key, code, fn);
+			} else {
+				printf("Aborting..\n");
+			}
+		} else {
 			sleep(1000);
 			hhkb_remap_key(handle, key, code, fn);
-		} else {
-			printf("Aborting..\n");
 		}
 	}
 	else if (action & ACTION_DUMP_FW) {
-		// Confirm operation
-		printf("This operation can take up to 5 minutes, during which the keyboard will not be functional.\nPlease type 'confirm' to continue: ");
-		char str[10];
-		fgets(str, 10, stdin);
+		if (!skip_confirmation) {
+			// Confirm operation
+			printf("This operation can take up to 5 minutes, during which the keyboard will not be functional.\nPlease type 'confirm' to continue: ");
+			char str[10];
+			fgets(str, 10, stdin);
 
-		// Check input text
-		if (!strcmp(str, "confirm\n")) {
+			// Check input text
+			if (!strcmp(str, "confirm\n")) {
+				printf("Dumping firmware...\n");
+				hhkb_dump_firmware(handle);
+			} else {
+				printf("Aborting..\n");
+			}
+		} else {
 			printf("Dumping firmware...\n");
 			hhkb_dump_firmware(handle);
-		} else {
-			printf("Aborting..\n");
 		}
 	}
 	else if (strlen(fw_file)) {
-		// Confirm operation
-		printf("Updating the firmware will take a couple of minutes, during which the keyboard will not be functional.\nPlease type 'confirm' to continue: ");
-		char str[10];
-		fgets(str, 10, stdin);
+		if (!skip_confirmation) {
+			// Confirm operation
+			printf("Updating the firmware will take a couple of minutes, during which the keyboard will not be functional.\nPlease type 'confirm' to continue: ");
+			char str[10];
+			fgets(str, 10, stdin);
 
-		// Check input text
-		if (!strcmp(str, "confirm\n")) {
-			hhkb_firmup(handle, fw_file);
+			// Check input text
+			if (!strcmp(str, "confirm\n")) {
+				hhkb_firmup(handle, fw_file);
+			} else {
+				printf("Aborting..\n");
+			}
 		} else {
-			printf("Aborting..\n");
+			hhkb_firmup(handle, fw_file);
 		}
 	}
 
