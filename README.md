@@ -10,7 +10,7 @@ A free, open-source alternative to the HHKB Keymap Tool provided by PFU.
 | Update firmware             |  Yes      |  -      |
 
 ## Building
-The only build dependencies are `cmake` and `libudev`, all other dependencies are included in the source tree. 
+The only build dependencies are `cmake` and `libudev`, all other dependencies are included in the source tree.
 
 Install dependencies on Fedora-based distros:
 ```
@@ -34,7 +34,7 @@ Due to udev rules, this program will fail with a `Permission denied` error on mo
 
 There are two options to fix this:
 * Run `hhg` as root
-* Create a udev rule to allow hidraw access to local users. You can do this by running the following command as root: 
+* Create a udev rule to allow hidraw access to local users. You can do this by running the following command as root:
 
 ```
 echo 'KERNEL=="hidraw*", ATTRS{idVendor}=="04fe", TAG+="uaccess"' > /etc/udev/rules.d/01-hhkb-hid.rules && udevadm control --reload-rules && udevadm trigger
@@ -93,6 +93,14 @@ You can find all [USB HID scan codes here](https://gist.github.com/MightyPork/6d
 For example, to assign Print Screen to the Z key on your function layer, you would run:
 ```
 hhg --remap-key 17 --scancode 0x46 --fn
+```
+
+```shell
+# assign Super_L to Ctrl_L key
+sudo ./hhg --remap-key 05 --scancode 0xe0
+
+# assign Super key
+sudo ./hhg --remap-key 04 --scancode 0xe3
 ```
 
 ## License
